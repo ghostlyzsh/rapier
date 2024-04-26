@@ -17,7 +17,6 @@ pub struct RevoluteJoint {
 impl RevoluteJoint {
     /// Creates a new revolute joint allowing only relative rotations.
     #[cfg(feature = "dim2")]
-    #[allow(clippy::new_without_default)] // For symmetry with 3D which can’t have a Default impl.
     pub fn new() -> Self {
         let data = GenericJointBuilder::new(JointAxesMask::LOCKED_REVOLUTE_AXES);
         Self { data: data.build() }
@@ -138,9 +137,9 @@ impl RevoluteJoint {
     }
 }
 
-impl From<RevoluteJoint> for GenericJoint {
-    fn from(val: RevoluteJoint) -> GenericJoint {
-        val.data
+impl Into<GenericJoint> for RevoluteJoint {
+    fn into(self) -> GenericJoint {
+        self.data
     }
 }
 
@@ -154,7 +153,6 @@ pub struct RevoluteJointBuilder(pub RevoluteJoint);
 impl RevoluteJointBuilder {
     /// Creates a new revolute joint builder.
     #[cfg(feature = "dim2")]
-    #[allow(clippy::new_without_default)] // For symmetry with 3D which can’t have a Default impl.
     pub fn new() -> Self {
         Self(RevoluteJoint::new())
     }
@@ -243,8 +241,8 @@ impl RevoluteJointBuilder {
     }
 }
 
-impl From<RevoluteJointBuilder> for GenericJoint {
-    fn from(val: RevoluteJointBuilder) -> GenericJoint {
-        val.0.into()
+impl Into<GenericJoint> for RevoluteJointBuilder {
+    fn into(self) -> GenericJoint {
+        self.0.into()
     }
 }

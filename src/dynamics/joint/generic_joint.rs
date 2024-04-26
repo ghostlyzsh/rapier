@@ -1,5 +1,3 @@
-#![allow(clippy::bad_bit_mask)] // Clippy will complain about the bitmasks due to JointAxesMask::FREE_FIXED_AXES being 0.
-
 use crate::dynamics::solver::MotorParameters;
 use crate::dynamics::{FixedJoint, MotorModel, PrismaticJoint, RevoluteJoint, RopeJoint};
 use crate::math::{Isometry, Point, Real, Rotation, UnitVector, Vector, SPATIAL_DIM};
@@ -706,8 +704,8 @@ impl GenericJointBuilder {
     }
 }
 
-impl From<GenericJointBuilder> for GenericJoint {
-    fn from(val: GenericJointBuilder) -> GenericJoint {
-        val.0
+impl Into<GenericJoint> for GenericJointBuilder {
+    fn into(self) -> GenericJoint {
+        self.0
     }
 }

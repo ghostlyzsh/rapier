@@ -46,7 +46,6 @@ impl Default for OrbitCamera {
 
 pub struct OrbitCameraPlugin;
 impl OrbitCameraPlugin {
-    #[allow(clippy::type_complexity)]
     fn update_transform_system(
         mut query: Query<(&OrbitCamera, &mut Transform), (Changed<OrbitCamera>, With<Camera>)>,
     ) {
@@ -61,7 +60,7 @@ impl OrbitCameraPlugin {
     fn mouse_motion_system(
         time: Res<Time>,
         mut mouse_motion_events: EventReader<MouseMotion>,
-        mouse_button_input: Res<ButtonInput<MouseButton>>,
+        mouse_button_input: Res<Input<MouseButton>>,
         mut query: Query<(&mut OrbitCamera, &mut Transform, &mut Camera)>,
     ) {
         let mut delta = Vec2::ZERO;

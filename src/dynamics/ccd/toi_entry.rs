@@ -169,15 +169,13 @@ impl TOIEntry {
 
 impl PartialOrd for TOIEntry {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
+        (-self.toi).partial_cmp(&(-other.toi))
     }
 }
 
 impl Ord for TOIEntry {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        (-self.toi)
-            .partial_cmp(&(-other.toi))
-            .unwrap_or(std::cmp::Ordering::Equal)
+        self.partial_cmp(other).unwrap()
     }
 }
 

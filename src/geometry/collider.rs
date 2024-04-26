@@ -1,8 +1,8 @@
 use crate::dynamics::{CoefficientCombineRule, MassProperties, RigidBodyHandle};
 use crate::geometry::{
-    ActiveCollisionTypes, BroadPhaseProxyIndex, ColliderBroadPhaseData, ColliderChanges,
-    ColliderFlags, ColliderMassProps, ColliderMaterial, ColliderParent, ColliderPosition,
-    ColliderShape, ColliderType, InteractionGroups, SharedShape,
+    ActiveCollisionTypes, ColliderBroadPhaseData, ColliderChanges, ColliderFlags,
+    ColliderMassProps, ColliderMaterial, ColliderParent, ColliderPosition, ColliderShape,
+    ColliderType, InteractionGroups, SharedShape,
 };
 use crate::math::{AngVector, Isometry, Point, Real, Rotation, Vector, DIM};
 use crate::parry::transformation::vhacd::VHACDParameters;
@@ -50,21 +50,6 @@ impl Collider {
         }
     }
 
-    /// An internal index associated to this collider by the broad-phase algorithm.
-    pub fn internal_broad_phase_proxy_index(&self) -> BroadPhaseProxyIndex {
-        self.bf_data.proxy_index
-    }
-
-    /// Sets the internal index associated to this collider by the broad-phase algorithm.
-    ///
-    /// This must **not** be called, unless you are implementing your own custom broad-phase
-    /// that require storing an index in the collider struct.
-    /// Modifying that index outside of a custom broad-phase code will most certainly break
-    /// the physics engine.
-    pub fn set_internal_broad_phase_proxy_index(&mut self, id: BroadPhaseProxyIndex) {
-        self.bf_data.proxy_index = id;
-    }
-
     /// The rigid body this collider is attached to.
     pub fn parent(&self) -> Option<RigidBodyHandle> {
         self.parent.map(|parent| parent.handle)
@@ -73,53 +58,6 @@ impl Collider {
     /// Is this collider a sensor?
     pub fn is_sensor(&self) -> bool {
         self.coll_type.is_sensor()
-    }
-
-    /// Copy all the characteristics from `other` to `self`.
-    ///
-    /// If you have a mutable reference to a collider `collider: &mut Collider`, attempting to
-    /// assign it a whole new collider instance, e.g., `*collider = ColliderBuilder::ball(0.5).build()`,
-    /// will crash due to some internal indices being overwritten. Instead, use
-    /// `collider.copy_from(&ColliderBuilder::ball(0.5).build())`.
-    ///
-    /// This method will allow you to set most characteristics of this collider from another
-    /// collider instance without causing any breakage.
-    ///
-    /// This method **cannot** be used for reparenting a collider. Therefore, the parent of the
-    /// `other` (if any), as well as its relative position to that parent will not be copied into
-    /// `self`.
-    ///
-    /// The pose of `other` will only copied into `self` if `self` doesn’t have a parent (if it has
-    /// a parent, its position is directly controlled by the parent rigid-body).
-    pub fn copy_from(&mut self, other: &Collider) {
-        // NOTE: we deconstruct the collider struct to be sure we don’t forget to
-        //       add some copies here if we add more field to Collider in the future.
-        let Collider {
-            coll_type,
-            shape,
-            mprops,
-            changes: _changes, // Will be set to ALL.
-            parent: _parent,   // This function cannot be used to reparent the collider.
-            pos,
-            material,
-            flags,
-            bf_data: _bf_data, // Internal ids must not be overwritten.
-            contact_force_event_threshold,
-            user_data,
-        } = other;
-
-        if self.parent.is_none() {
-            self.pos = *pos;
-        }
-
-        self.coll_type = *coll_type;
-        self.shape = shape.clone();
-        self.mprops = mprops.clone();
-        self.material = *material;
-        self.contact_force_event_threshold = *contact_force_event_threshold;
-        self.user_data = *user_data;
-        self.flags = *flags;
-        self.changes = ColliderChanges::all();
     }
 
     /// The physics hooks enabled for this collider.
@@ -219,7 +157,10 @@ impl Collider {
 
     /// Is this collider enabled?
     pub fn is_enabled(&self) -> bool {
-        matches!(self.flags.enabled, ColliderEnabled::Enabled)
+        match self.flags.enabled {
+            ColliderEnabled::Enabled => true,
+            _ => false,
+        }
     }
 
     /// Sets whether or not this collider is enabled.
@@ -975,8 +916,8 @@ impl ColliderBuilder {
     }
 }
 
-impl From<ColliderBuilder> for Collider {
-    fn from(val: ColliderBuilder) -> Collider {
-        val.build()
+impl Into<Collider> for ColliderBuilder {
+    fn into(self) -> Collider {
+        self.build()
     }
 }

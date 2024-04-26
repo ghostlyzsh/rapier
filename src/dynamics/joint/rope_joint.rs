@@ -134,9 +134,9 @@ impl RopeJoint {
     }
 }
 
-impl From<RopeJoint> for GenericJoint {
-    fn from(val: RopeJoint) -> GenericJoint {
-        val.data
+impl Into<GenericJoint> for RopeJoint {
+    fn into(self) -> GenericJoint {
+        self.data
     }
 }
 
@@ -231,8 +231,8 @@ impl RopeJointBuilder {
     }
 }
 
-impl From<RopeJointBuilder> for GenericJoint {
-    fn from(val: RopeJointBuilder) -> GenericJoint {
-        val.0.into()
+impl Into<GenericJoint> for RopeJointBuilder {
+    fn into(self) -> GenericJoint {
+        self.0.into()
     }
 }

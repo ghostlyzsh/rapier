@@ -154,7 +154,7 @@ impl SimdOneBodyConstraintBuilder {
                         rhs: na::zero(),
                         rhs_wo_bias: na::zero(),
                         impulse: na::zero(),
-                        impulse_accumulator: na::zero(),
+                        total_impulse: na::zero(),
                         r: projected_mass,
                     };
                 }
@@ -259,18 +259,19 @@ impl SimdOneBodyConstraintBuilder {
                     .simd_clamp(-max_penetration_correction, SimdReal::zero())
                     * erp_inv_dt;
                 let new_rhs = rhs_wo_bias + rhs_bias;
+                let total_impulse = element.normal_part.total_impulse + element.normal_part.impulse;
                 is_fast_contact =
                     is_fast_contact | (-new_rhs * dt).simd_gt(ccd_thickness * SimdReal::splat(0.5));
 
                 element.normal_part.rhs_wo_bias = rhs_wo_bias;
                 element.normal_part.rhs = new_rhs;
-                element.normal_part.impulse_accumulator += element.normal_part.impulse;
+                element.normal_part.total_impulse = total_impulse;
                 element.normal_part.impulse = na::zero();
             }
 
             // tangent parts.
             {
-                element.tangent_part.impulse_accumulator += element.tangent_part.impulse;
+                element.tangent_part.total_impulse += element.tangent_part.impulse;
                 element.tangent_part.impulse = na::zero();
 
                 for j in 0..DIM - 1 {
@@ -307,8 +308,12 @@ impl OneBodyConstraintSimd {
         solve_friction: bool,
     ) {
         let mut solver_vel2 = SolverVel {
-            linear: Vector::from(gather![|ii| solver_vels[self.solver_vel2[ii]].linear]),
-            angular: AngVector::from(gather![|ii| solver_vels[self.solver_vel2[ii]].angular]),
+            linear: Vector::from(gather![
+                |ii| solver_vels[self.solver_vel2[ii] as usize].linear
+            ]),
+            angular: AngVector::from(gather![
+                |ii| solver_vels[self.solver_vel2[ii] as usize].angular
+            ]),
         };
 
         OneBodyConstraintElement::solve_group(
@@ -325,20 +330,19 @@ impl OneBodyConstraintSimd {
         );
 
         for ii in 0..SIMD_WIDTH {
-            solver_vels[self.solver_vel2[ii]].linear = solver_vel2.linear.extract(ii);
-            solver_vels[self.solver_vel2[ii]].angular = solver_vel2.angular.extract(ii);
+            solver_vels[self.solver_vel2[ii] as usize].linear = solver_vel2.linear.extract(ii);
+            solver_vels[self.solver_vel2[ii] as usize].angular = solver_vel2.angular.extract(ii);
         }
     }
 
     // FIXME: duplicated code. This is exactly the same as in the two-body velocity constraint.
     pub fn writeback_impulses(&self, manifolds_all: &mut [&mut ContactManifold]) {
         for k in 0..self.num_contacts as usize {
-            let impulses: [_; SIMD_WIDTH] = self.elements[k].normal_part.total_impulse().into();
+            let impulses: [_; SIMD_WIDTH] = self.elements[k].normal_part.impulse.into();
             #[cfg(feature = "dim2")]
-            let tangent_impulses: [_; SIMD_WIDTH] =
-                self.elements[k].tangent_part.total_impulse()[0].into();
+            let tangent_impulses: [_; SIMD_WIDTH] = self.elements[k].tangent_part.impulse[0].into();
             #[cfg(feature = "dim3")]
-            let tangent_impulses = self.elements[k].tangent_part.total_impulse();
+            let tangent_impulses = self.elements[k].tangent_part.impulse;
 
             for ii in 0..SIMD_WIDTH {
                 let manifold = &mut manifolds_all[self.manifold_id[ii]];

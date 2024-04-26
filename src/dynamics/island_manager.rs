@@ -134,7 +134,7 @@ impl IslandManager {
     }
 
     #[inline(always)]
-    pub(crate) fn iter_active_bodies(&self) -> impl Iterator<Item = RigidBodyHandle> + '_ {
+    pub(crate) fn iter_active_bodies<'a>(&'a self) -> impl Iterator<Item = RigidBodyHandle> + 'a {
         self.active_dynamic_set
             .iter()
             .copied()

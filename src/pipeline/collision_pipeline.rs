@@ -43,7 +43,7 @@ impl CollisionPipeline {
     fn detect_collisions(
         &mut self,
         prediction_distance: Real,
-        broad_phase: &mut dyn BroadPhase,
+        broad_phase: &mut BroadPhase,
         narrow_phase: &mut NarrowPhase,
         bodies: &mut RigidBodySet,
         colliders: &mut ColliderSet,
@@ -107,7 +107,7 @@ impl CollisionPipeline {
     pub fn step(
         &mut self,
         prediction_distance: Real,
-        broad_phase: &mut dyn BroadPhase,
+        broad_phase: &mut BroadPhase,
         narrow_phase: &mut NarrowPhase,
         bodies: &mut RigidBodySet,
         colliders: &mut ColliderSet,
@@ -149,7 +149,7 @@ impl CollisionPipeline {
             bodies,
             colliders,
             &modified_colliders[..],
-            &removed_colliders,
+            &mut removed_colliders,
             hooks,
             events,
             true,
@@ -192,7 +192,7 @@ mod tests {
         let _ = collider_set.insert(collider_b);
 
         let integration_parameters = IntegrationParameters::default();
-        let mut broad_phase = BroadPhaseMultiSap::new();
+        let mut broad_phase = BroadPhase::new();
         let mut narrow_phase = NarrowPhase::new();
         let mut collision_pipeline = CollisionPipeline::new();
         let physics_hooks = ();
@@ -244,7 +244,7 @@ mod tests {
         let _ = collider_set.insert(collider_b);
 
         let integration_parameters = IntegrationParameters::default();
-        let mut broad_phase = BroadPhaseMultiSap::new();
+        let mut broad_phase = BroadPhase::new();
         let mut narrow_phase = NarrowPhase::new();
         let mut collision_pipeline = CollisionPipeline::new();
         let physics_hooks = ();

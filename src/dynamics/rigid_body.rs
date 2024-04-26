@@ -74,61 +74,6 @@ impl RigidBody {
         self.ids = Default::default();
     }
 
-    /// Copy all the characteristics from `other` to `self`.
-    ///
-    /// If you have a mutable reference to a rigid-body `rigid_body: &mut RigidBody`, attempting to
-    /// assign it a whole new rigid-body instance, e.g., `*rigid_body = RigidBodyBuilder::dynamic().build()`,
-    /// will crash due to some internal indices being overwritten. Instead, use
-    /// `rigid_body.copy_from(&RigidBodyBuilder::dynamic().build())`.
-    ///
-    /// This method will allow you to set most characteristics of this rigid-body from another
-    /// rigid-body instance without causing any breakage.
-    ///
-    /// This method **cannot** be used for editing the list of colliders attached to this rigid-body.
-    /// Therefore, the list of colliders attached to `self` won’t be replaced by the one attached
-    /// to `other`.
-    ///
-    /// The pose of `other` will only copied into `self` if `self` doesn’t have a parent (if it has
-    /// a parent, its position is directly controlled by the parent rigid-body).
-    pub fn copy_from(&mut self, other: &RigidBody) {
-        // NOTE: we deconstruct the rigid-body struct to be sure we don’t forget to
-        //       add some copies here if we add more field to RigidBody in the future.
-        let RigidBody {
-            pos,
-            mprops,
-            integrated_vels,
-            vels,
-            damping,
-            forces,
-            ccd,
-            ids: _ids,             // Internal ids must not be overwritten.
-            colliders: _colliders, // This function cannot be used to edit collider sets.
-            activation,
-            changes: _changes, // Will be set to ALL.
-            body_type,
-            dominance,
-            enabled,
-            additional_solver_iterations,
-            user_data,
-        } = other;
-
-        self.pos = *pos;
-        self.mprops = mprops.clone();
-        self.integrated_vels = *integrated_vels;
-        self.vels = *vels;
-        self.damping = *damping;
-        self.forces = *forces;
-        self.ccd = *ccd;
-        self.activation = *activation;
-        self.body_type = *body_type;
-        self.dominance = *dominance;
-        self.enabled = *enabled;
-        self.additional_solver_iterations = *additional_solver_iterations;
-        self.user_data = *user_data;
-
-        self.changes = RigidBodyChanges::all();
-    }
-
     /// Set the additional number of solver iterations run for this rigid-body and
     /// everything interacting with it.
     ///
@@ -355,16 +300,16 @@ impl RigidBody {
         wake_up: bool,
     ) {
         #[cfg(feature = "dim2")]
-        if self.mprops.flags.contains(LockedAxes::TRANSLATION_LOCKED_X) != allow_translation_x
-            && self.mprops.flags.contains(LockedAxes::TRANSLATION_LOCKED_Y) != allow_translation_y
+        if self.mprops.flags.contains(LockedAxes::TRANSLATION_LOCKED_X) == !allow_translation_x
+            && self.mprops.flags.contains(LockedAxes::TRANSLATION_LOCKED_Y) == !allow_translation_y
         {
             // Nothing to change.
             return;
         }
         #[cfg(feature = "dim3")]
-        if self.mprops.flags.contains(LockedAxes::TRANSLATION_LOCKED_X) != allow_translation_x
-            && self.mprops.flags.contains(LockedAxes::TRANSLATION_LOCKED_Y) != allow_translation_y
-            && self.mprops.flags.contains(LockedAxes::TRANSLATION_LOCKED_Z) != allow_translation_z
+        if self.mprops.flags.contains(LockedAxes::TRANSLATION_LOCKED_X) == !allow_translation_x
+            && self.mprops.flags.contains(LockedAxes::TRANSLATION_LOCKED_Y) == !allow_translation_y
+            && self.mprops.flags.contains(LockedAxes::TRANSLATION_LOCKED_Z) == !allow_translation_z
         {
             // Nothing to change.
             return;
@@ -872,17 +817,6 @@ impl RigidBody {
             .integrate_forces_and_velocities(dt, &self.forces, &self.vels, &self.mprops)
     }
 
-    /// Predicts the next position of this rigid-body, by integrating only its velocity
-    /// by a time of `dt`.
-    ///
-    /// The forces that were applied to this rigid-body since the last physics step will
-    /// be ignored by this function. Use [`Self::predict_position_using_velocity_and_forces`]
-    /// instead to take forces into account.
-    pub fn predict_position_using_velocity(&self, dt: Real) -> Isometry<Real> {
-        self.vels
-            .integrate(dt, &self.pos.position, &self.mprops.local_mprops.local_com)
-    }
-
     pub(crate) fn update_world_mass_properties(&mut self) {
         self.mprops.update_world_mass_properties(&self.pos.position);
     }
@@ -916,11 +850,13 @@ impl RigidBody {
     ///
     /// This does nothing on non-dynamic bodies.
     pub fn add_force(&mut self, force: Vector<Real>, wake_up: bool) {
-        if !force.is_zero() && self.body_type == RigidBodyType::Dynamic {
-            self.forces.user_force += force;
+        if !force.is_zero() {
+            if self.body_type == RigidBodyType::Dynamic {
+                self.forces.user_force += force;
 
-            if wake_up {
-                self.wake_up(true);
+                if wake_up {
+                    self.wake_up(true);
+                }
             }
         }
     }
@@ -930,11 +866,13 @@ impl RigidBody {
     /// This does nothing on non-dynamic bodies.
     #[cfg(feature = "dim2")]
     pub fn add_torque(&mut self, torque: Real, wake_up: bool) {
-        if !torque.is_zero() && self.body_type == RigidBodyType::Dynamic {
-            self.forces.user_torque += torque;
+        if !torque.is_zero() {
+            if self.body_type == RigidBodyType::Dynamic {
+                self.forces.user_torque += torque;
 
-            if wake_up {
-                self.wake_up(true);
+                if wake_up {
+                    self.wake_up(true);
+                }
             }
         }
     }
@@ -944,11 +882,13 @@ impl RigidBody {
     /// This does nothing on non-dynamic bodies.
     #[cfg(feature = "dim3")]
     pub fn add_torque(&mut self, torque: Vector<Real>, wake_up: bool) {
-        if !torque.is_zero() && self.body_type == RigidBodyType::Dynamic {
-            self.forces.user_torque += torque;
+        if !torque.is_zero() {
+            if self.body_type == RigidBodyType::Dynamic {
+                self.forces.user_torque += torque;
 
-            if wake_up {
-                self.wake_up(true);
+                if wake_up {
+                    self.wake_up(true);
+                }
             }
         }
     }
@@ -957,12 +897,14 @@ impl RigidBody {
     ///
     /// This does nothing on non-dynamic bodies.
     pub fn add_force_at_point(&mut self, force: Vector<Real>, point: Point<Real>, wake_up: bool) {
-        if !force.is_zero() && self.body_type == RigidBodyType::Dynamic {
-            self.forces.user_force += force;
-            self.forces.user_torque += (point - self.mprops.world_com).gcross(force);
+        if !force.is_zero() {
+            if self.body_type == RigidBodyType::Dynamic {
+                self.forces.user_force += force;
+                self.forces.user_torque += (point - self.mprops.world_com).gcross(force);
 
-            if wake_up {
-                self.wake_up(true);
+                if wake_up {
+                    self.wake_up(true);
+                }
             }
         }
     }
@@ -1437,8 +1379,8 @@ impl RigidBodyBuilder {
     }
 }
 
-impl From<RigidBodyBuilder> for RigidBody {
-    fn from(val: RigidBodyBuilder) -> RigidBody {
-        val.build()
+impl Into<RigidBody> for RigidBodyBuilder {
+    fn into(self) -> RigidBody {
+        self.build()
     }
 }

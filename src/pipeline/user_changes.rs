@@ -111,18 +111,20 @@ pub(crate) fn handle_user_changes_to_rigid_bodies(
                     }
 
                     // Update the active kinematic set.
-                    if (changes.contains(RigidBodyChanges::POSITION)
-                        || changes.contains(RigidBodyChanges::COLLIDERS))
-                        && rb.is_kinematic()
-                        && islands.active_kinematic_set.get(ids.active_set_id) != Some(handle)
+                    if changes.contains(RigidBodyChanges::POSITION)
+                        || changes.contains(RigidBodyChanges::COLLIDERS)
                     {
-                        ids.active_set_id = islands.active_kinematic_set.len();
-                        islands.active_kinematic_set.push(*handle);
+                        if rb.is_kinematic()
+                            && islands.active_kinematic_set.get(ids.active_set_id) != Some(handle)
+                        {
+                            ids.active_set_id = islands.active_kinematic_set.len();
+                            islands.active_kinematic_set.push(*handle);
+                        }
                     }
 
-                    // Push the body to the active set if it is not inside the active set yet, and
-                    // is either not longer sleeping or became dynamic.
-                    if (changes.contains(RigidBodyChanges::SLEEP) || changes.contains(RigidBodyChanges::TYPE))
+                    // Push the body to the active set if it is not
+                    // sleeping and if it is not already inside of the active set.
+                    if changes.contains(RigidBodyChanges::SLEEP)
                         && rb.is_enabled()
                         && !rb.activation.sleeping // May happen if the body was put to sleep manually.
                         && rb.is_dynamic() // Only dynamic bodies are in the active dynamic set.

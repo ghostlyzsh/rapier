@@ -41,17 +41,12 @@ impl Default for DebugRenderMode {
     }
 }
 
-#[cfg(feature = "dim2")]
-type InstancesMap = HashMap<TypeId, Vec<Point<Real>>>;
-#[cfg(feature = "dim3")]
-type InstancesMap = HashMap<TypeId, (Vec<Point<Real>>, Vec<[u32; 2]>)>;
-
 /// Pipeline responsible for rendering the state of the physics engine for debugging purpose.
 pub struct DebugRenderPipeline {
     #[cfg(feature = "dim2")]
-    instances: InstancesMap,
+    instances: HashMap<TypeId, Vec<Point<Real>>>,
     #[cfg(feature = "dim3")]
-    instances: InstancesMap,
+    instances: HashMap<TypeId, (Vec<Point<Real>>, Vec<[u32; 2]>)>,
     /// The style used to compute the line colors for each element
     /// to render.
     pub style: DebugRenderStyle,

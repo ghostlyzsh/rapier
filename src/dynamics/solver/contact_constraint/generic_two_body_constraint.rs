@@ -201,7 +201,7 @@ impl GenericTwoBodyConstraintBuilder {
                         gcross2,
                         rhs: na::zero(),
                         rhs_wo_bias: na::zero(),
-                        impulse_accumulator: na::zero(),
+                        total_impulse: na::zero(),
                         impulse: na::zero(),
                         r,
                     };
@@ -382,15 +382,15 @@ impl GenericTwoBodyConstraint {
         solve_friction: bool,
     ) {
         let mut solver_vel1 = if self.generic_constraint_mask & 0b01 == 0 {
-            GenericRhs::SolverVel(solver_vels[self.inner.solver_vel1])
+            GenericRhs::SolverVel(solver_vels[self.inner.solver_vel1 as usize])
         } else {
-            GenericRhs::GenericId(self.inner.solver_vel1)
+            GenericRhs::GenericId(self.inner.solver_vel1 as usize)
         };
 
         let mut solver_vel2 = if self.generic_constraint_mask & 0b10 == 0 {
-            GenericRhs::SolverVel(solver_vels[self.inner.solver_vel2])
+            GenericRhs::SolverVel(solver_vels[self.inner.solver_vel2 as usize])
         } else {
-            GenericRhs::GenericId(self.inner.solver_vel2)
+            GenericRhs::GenericId(self.inner.solver_vel2 as usize)
         };
 
         let elements = &mut self.inner.elements[..self.inner.num_contacts as usize];
@@ -415,11 +415,11 @@ impl GenericTwoBodyConstraint {
         );
 
         if let GenericRhs::SolverVel(solver_vel1) = solver_vel1 {
-            solver_vels[self.inner.solver_vel1] = solver_vel1;
+            solver_vels[self.inner.solver_vel1 as usize] = solver_vel1;
         }
 
         if let GenericRhs::SolverVel(solver_vel2) = solver_vel2 {
-            solver_vels[self.inner.solver_vel2] = solver_vel2;
+            solver_vels[self.inner.solver_vel2 as usize] = solver_vel2;
         }
     }
 

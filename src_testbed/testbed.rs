@@ -1,5 +1,3 @@
-#![allow(clippy::bad_bit_mask)] // otherwsie clippy complains because of TestbedStateFlags::NONE which is 0.
-
 use std::env;
 use std::mem;
 use std::num::NonZeroUsize;
@@ -7,7 +5,7 @@ use std::num::NonZeroUsize;
 use bevy::prelude::*;
 
 use crate::debug_render::{DebugRenderPipelineResource, RapierDebugRenderPlugin};
-use crate::physics::{DeserializedPhysicsSnapshot, PhysicsEvents, PhysicsSnapshot, PhysicsState};
+use crate::physics::{PhysicsEvents, PhysicsSnapshot, PhysicsState};
 use crate::plugin::TestbedPlugin;
 use crate::ui;
 use crate::{graphics::GraphicsManager, harness::RunState};
@@ -24,14 +22,15 @@ use rapier::dynamics::{
 use rapier::geometry::Ray;
 use rapier::geometry::{ColliderHandle, ColliderSet, NarrowPhase};
 use rapier::math::{Real, Vector};
-use rapier::pipeline::{PhysicsHooks, QueryFilter, QueryPipeline};
+use rapier::pipeline::{PhysicsHooks, QueryFilter};
 
 #[cfg(all(feature = "dim2", feature = "other-backends"))]
 use crate::box2d_backend::Box2dWorld;
 use crate::harness::Harness;
 #[cfg(all(feature = "dim3", feature = "other-backends"))]
 use crate::physx_backend::PhysxWorld;
-use bevy::render::camera::{Camera, ClearColor};
+use bevy::render::camera::Camera;
+use bevy_core_pipeline::prelude::ClearColor;
 use bevy_egui::EguiContexts;
 use bevy_pbr::wireframe::WireframePlugin;
 use bevy_pbr::AmbientLight;
@@ -108,8 +107,6 @@ pub enum RapierSolverType {
     StandardPgs,
 }
 
-pub type SimulationBuilders = Vec<(&'static str, fn(&mut Testbed))>;
-
 #[derive(Resource)]
 pub struct TestbedState {
     pub running: RunMode,
@@ -138,7 +135,7 @@ pub struct TestbedState {
 }
 
 #[derive(Resource)]
-struct SceneBuilders(SimulationBuilders);
+struct SceneBuilders(Vec<(&'static str, fn(&mut Testbed))>);
 
 #[cfg(feature = "other-backends")]
 struct OtherBackends {
@@ -154,11 +151,11 @@ pub struct TestbedGraphics<'a, 'b, 'c, 'd, 'e, 'f> {
     commands: &'a mut Commands<'d, 'e>,
     meshes: &'a mut Assets<Mesh>,
     materials: &'a mut Assets<BevyMaterial>,
-    components: &'a mut Query<'b, 'f, &'c mut Transform>,
+    components: &'a mut Query<'b, 'f, (&'c mut Transform,)>,
     #[allow(dead_code)] // Dead in 2D but not in 3D.
     camera_transform: GlobalTransform,
     camera: &'a mut OrbitCamera,
-    keys: &'a ButtonInput<KeyCode>,
+    keys: &'a Input<KeyCode>,
 }
 
 pub struct Testbed<'a, 'b, 'c, 'd, 'e, 'f> {
@@ -240,7 +237,7 @@ impl TestbedApp {
         }
     }
 
-    pub fn from_builders(default: usize, builders: SimulationBuilders) -> Self {
+    pub fn from_builders(default: usize, builders: Vec<(&'static str, fn(&mut Testbed))>) -> Self {
         let mut res = TestbedApp::new_empty();
         res.state
             .action_flags
@@ -250,7 +247,7 @@ impl TestbedApp {
         res
     }
 
-    pub fn set_builders(&mut self, builders: SimulationBuilders) {
+    pub fn set_builders(&mut self, builders: Vec<(&'static str, fn(&mut Testbed))>) {
         self.state.example_names = builders.iter().map(|e| e.0).collect();
         self.builders = SceneBuilders(builders)
     }
@@ -283,7 +280,7 @@ impl TestbedApp {
             use std::io::{BufWriter, Write};
             // Don't enter the main loop. We will just step the simulation here.
             let mut results = Vec::new();
-            let builders = mem::take(&mut self.builders.0);
+            let builders = mem::replace(&mut self.builders.0, Vec::new());
             let backend_names = self.state.backend_names.clone();
 
             for builder in builders {
@@ -426,7 +423,8 @@ impl TestbedApp {
 
 impl<'a, 'b, 'c, 'd, 'e, 'f> TestbedGraphics<'a, 'b, 'c, 'd, 'e, 'f> {
     pub fn set_body_color(&mut self, body: RigidBodyHandle, color: [f32; 3]) {
-        self.graphics.set_body_color(self.materials, body, color);
+        self.graphics
+            .set_body_color(&mut self.materials, body, color);
     }
 
     pub fn add_body(
@@ -467,8 +465,8 @@ impl<'a, 'b, 'c, 'd, 'e, 'f> TestbedGraphics<'a, 'b, 'c, 'd, 'e, 'f> {
         )
     }
 
-    pub fn keys(&self) -> &ButtonInput<KeyCode> {
-        self.keys
+    pub fn keys(&self) -> &Input<KeyCode> {
+        &*self.keys
     }
 }
 
@@ -499,7 +497,7 @@ impl<'a, 'b, 'c, 'd, 'e, 'f> Testbed<'a, 'b, 'c, 'd, 'e, 'f> {
     }
 
     pub fn harness_mut(&mut self) -> &mut Harness {
-        self.harness
+        &mut self.harness
     }
 
     pub fn set_world(
@@ -659,7 +657,7 @@ impl<'a, 'b, 'c, 'd, 'e, 'f> Testbed<'a, 'b, 'c, 'd, 'e, 'f> {
     }
 
     #[cfg(feature = "dim3")]
-    fn update_vehicle_controller(&mut self, events: &ButtonInput<KeyCode>) {
+    fn update_vehicle_controller(&mut self, events: &Input<KeyCode>) {
         if self.state.running == RunMode::Stop {
             return;
         }
@@ -670,16 +668,16 @@ impl<'a, 'b, 'c, 'd, 'e, 'f> Testbed<'a, 'b, 'c, 'd, 'e, 'f> {
 
             for key in events.get_pressed() {
                 match *key {
-                    KeyCode::ArrowRight => {
+                    KeyCode::Right => {
                         steering_angle += -0.7;
                     }
-                    KeyCode::ArrowLeft => {
+                    KeyCode::Left => {
                         steering_angle += 0.7;
                     }
-                    KeyCode::ArrowUp => {
+                    KeyCode::Up => {
                         engine_force += 30.0;
                     }
-                    KeyCode::ArrowDown => {
+                    KeyCode::Down => {
                         engine_force += -30.0;
                     }
                     _ => {}
@@ -702,7 +700,7 @@ impl<'a, 'b, 'c, 'd, 'e, 'f> Testbed<'a, 'b, 'c, 'd, 'e, 'f> {
         }
     }
 
-    fn update_character_controller(&mut self, events: &ButtonInput<KeyCode>) {
+    fn update_character_controller(&mut self, events: &Input<KeyCode>) {
         if self.state.running == RunMode::Stop {
             return;
         }
@@ -714,10 +712,10 @@ impl<'a, 'b, 'c, 'd, 'e, 'f> Testbed<'a, 'b, 'c, 'd, 'e, 'f> {
             #[cfg(feature = "dim2")]
             for key in events.get_pressed() {
                 match *key {
-                    KeyCode::ArrowRight => {
+                    KeyCode::Right => {
                         desired_movement += Vector::x();
                     }
-                    KeyCode::ArrowLeft => {
+                    KeyCode::Left => {
                         desired_movement -= Vector::x();
                     }
                     KeyCode::Space => {
@@ -749,16 +747,16 @@ impl<'a, 'b, 'c, 'd, 'e, 'f> Testbed<'a, 'b, 'c, 'd, 'e, 'f> {
 
                 for key in events.get_pressed() {
                     match *key {
-                        KeyCode::ArrowRight => {
+                        KeyCode::Right => {
                             desired_movement += rot_x;
                         }
-                        KeyCode::ArrowLeft => {
+                        KeyCode::Left => {
                             desired_movement -= rot_x;
                         }
-                        KeyCode::ArrowUp => {
+                        KeyCode::Up => {
                             desired_movement -= rot_z;
                         }
-                        KeyCode::ArrowDown => {
+                        KeyCode::Down => {
                             desired_movement += rot_z;
                         }
                         KeyCode::Space => {
@@ -817,22 +815,22 @@ impl<'a, 'b, 'c, 'd, 'e, 'f> Testbed<'a, 'b, 'c, 'd, 'e, 'f> {
         }
     }
 
-    fn handle_common_events(&mut self, events: &ButtonInput<KeyCode>) {
+    fn handle_common_events(&mut self, events: &Input<KeyCode>) {
         for key in events.get_just_released() {
             match *key {
-                KeyCode::KeyT => {
+                KeyCode::T => {
                     if self.state.running == RunMode::Stop {
                         self.state.running = RunMode::Running;
                     } else {
                         self.state.running = RunMode::Stop;
                     }
                 }
-                KeyCode::KeyS => self.state.running = RunMode::Step,
-                KeyCode::KeyR => self
+                KeyCode::S => self.state.running = RunMode::Step,
+                KeyCode::R => self
                     .state
                     .action_flags
                     .set(TestbedActionFlags::EXAMPLE_CHANGED, true),
-                KeyCode::KeyC => {
+                KeyCode::C => {
                     // Delete 1 collider of 10% of the remaining dynamic bodies.
                     let mut colliders: Vec<_> = self
                         .harness
@@ -858,7 +856,7 @@ impl<'a, 'b, 'c, 'd, 'e, 'f> Testbed<'a, 'b, 'c, 'd, 'e, 'f> {
                         );
                     }
                 }
-                KeyCode::KeyD => {
+                KeyCode::D => {
                     // Delete 10% of the remaining dynamic bodies.
                     let dynamic_bodies: Vec<_> = self
                         .harness
@@ -883,7 +881,7 @@ impl<'a, 'b, 'c, 'd, 'e, 'f> Testbed<'a, 'b, 'c, 'd, 'e, 'f> {
                         );
                     }
                 }
-                KeyCode::KeyJ => {
+                KeyCode::J => {
                     // Delete 10% of the remaining impulse_joints.
                     let impulse_joints: Vec<_> = self
                         .harness
@@ -897,7 +895,7 @@ impl<'a, 'b, 'c, 'd, 'e, 'f> Testbed<'a, 'b, 'c, 'd, 'e, 'f> {
                         self.harness.physics.impulse_joints.remove(*to_delete, true);
                     }
                 }
-                KeyCode::KeyA => {
+                KeyCode::A => {
                     // Delete 10% of the remaining multibody_joints.
                     let multibody_joints: Vec<_> = self
                         .harness
@@ -914,7 +912,7 @@ impl<'a, 'b, 'c, 'd, 'e, 'f> Testbed<'a, 'b, 'c, 'd, 'e, 'f> {
                             .remove(*to_delete, true);
                     }
                 }
-                KeyCode::KeyM => {
+                KeyCode::M => {
                     // Delete one remaining multibody.
                     let to_delete = self
                         .harness
@@ -1012,14 +1010,10 @@ fn draw_contacts(_nf: &NarrowPhase, _colliders: &ColliderSet) {
 
 #[cfg(feature = "dim3")]
 fn setup_graphics_environment(mut commands: Commands) {
-    commands.insert_resource(AmbientLight {
-        brightness: 100.0,
-        ..Default::default()
-    });
-
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
-            shadows_enabled: false,
+            illuminance: 10000.0,
+            shadows_enabled: true,
             ..Default::default()
         },
         transform: Transform {
@@ -1105,10 +1099,9 @@ fn update_testbed(
     #[cfg(feature = "other-backends")] mut other_backends: NonSendMut<OtherBackends>,
     mut plugins: NonSendMut<Plugins>,
     mut ui_context: EguiContexts,
-    mut gfx_components: Query<&mut Transform>,
+    mut gfx_components: Query<(&mut Transform,)>,
     mut cameras: Query<(&Camera, &GlobalTransform, &mut OrbitCamera)>,
-    mut material_handles: Query<&mut Handle<BevyMaterial>>,
-    keys: Res<ButtonInput<KeyCode>>,
+    keys: Res<Input<KeyCode>>,
 ) {
     let meshes = &mut *meshes;
     let materials = &mut *materials;
@@ -1117,30 +1110,30 @@ fn update_testbed(
     // Handle inputs
     {
         let graphics_context = TestbedGraphics {
-            graphics: &mut graphics,
+            graphics: &mut *graphics,
             commands: &mut commands,
             meshes: &mut *meshes,
             materials: &mut *materials,
             components: &mut gfx_components,
             camera_transform: *cameras.single().1,
             camera: &mut cameras.single_mut().2,
-            keys: &keys,
+            keys: &*keys,
         };
 
         let mut testbed = Testbed {
             graphics: Some(graphics_context),
-            state: &mut state,
-            harness: &mut harness,
+            state: &mut *state,
+            harness: &mut *harness,
             #[cfg(feature = "other-backends")]
-            other_backends: &mut other_backends,
-            plugins: &mut plugins,
+            other_backends: &mut *other_backends,
+            plugins: &mut *plugins,
         };
 
-        testbed.handle_common_events(&keys);
-        testbed.update_character_controller(&keys);
+        testbed.handle_common_events(&*keys);
+        testbed.update_character_controller(&*keys);
         #[cfg(feature = "dim3")]
         {
-            testbed.update_vehicle_controller(&keys);
+            testbed.update_vehicle_controller(&*keys);
         }
     }
 
@@ -1151,7 +1144,7 @@ fn update_testbed(
 
         for plugin in &mut plugins.0 {
             plugin.update_ui(
-                &ui_context,
+                &mut ui_context,
                 harness,
                 &mut graphics,
                 &mut commands,
@@ -1197,10 +1190,10 @@ fn update_testbed(
                 .set(TestbedActionFlags::EXAMPLE_CHANGED, false);
             clear(&mut commands, &mut state, &mut graphics, &mut plugins);
             harness.clear_callbacks();
-            for plugin in plugins.0.iter_mut() {
+            for plugin in (*plugins).0.iter_mut() {
                 plugin.clear_graphics(&mut graphics, &mut commands);
             }
-            plugins.0.clear();
+            (*plugins).0.clear();
 
             if state.selected_example != prev_example {
                 harness.physics.integration_parameters = IntegrationParameters::default();
@@ -1226,16 +1219,16 @@ fn update_testbed(
                 components: &mut gfx_components,
                 camera_transform: *cameras.single().1,
                 camera: &mut cameras.single_mut().2,
-                keys: &keys,
+                keys: &*keys,
             };
 
             let mut testbed = Testbed {
                 graphics: Some(graphics_context),
-                state: &mut state,
-                harness: &mut harness,
+                state: &mut *state,
+                harness: &mut *harness,
                 #[cfg(feature = "other-backends")]
-                other_backends: &mut other_backends,
-                plugins: &mut plugins,
+                other_backends: &mut *other_backends,
+                plugins: &mut *plugins,
             };
 
             builders.0[selected_example].1(&mut testbed);
@@ -1254,11 +1247,9 @@ fn update_testbed(
                 harness.state.timestep_id,
                 &harness.physics.broad_phase,
                 &harness.physics.narrow_phase,
-                &harness.physics.islands,
                 &harness.physics.bodies,
                 &harness.physics.colliders,
                 &harness.physics.impulse_joints,
-                &harness.physics.multibody_joints,
             )
             .ok();
 
@@ -1275,36 +1266,17 @@ fn update_testbed(
                 .action_flags
                 .set(TestbedActionFlags::RESTORE_SNAPSHOT, false);
             if let Some(snapshot) = &state.snapshot {
-                if let Ok(DeserializedPhysicsSnapshot {
-                    timestep_id,
-                    broad_phase,
-                    narrow_phase,
-                    island_manager,
-                    bodies,
-                    colliders,
-                    impulse_joints,
-                    multibody_joints,
-                }) = snapshot.restore()
-                {
+                if let Ok(w) = snapshot.restore() {
                     clear(&mut commands, &mut state, &mut graphics, &mut plugins);
 
                     for plugin in &mut plugins.0 {
                         plugin.clear_graphics(&mut graphics, &mut commands);
                     }
 
-                    harness.state.timestep_id = timestep_id;
-                    harness.physics.broad_phase = broad_phase;
-                    harness.physics.narrow_phase = narrow_phase;
-                    harness.physics.islands = island_manager;
-                    harness.physics.bodies = bodies;
-                    harness.physics.colliders = colliders;
-                    harness.physics.impulse_joints = impulse_joints;
-                    harness.physics.multibody_joints = multibody_joints;
-                    harness.physics.query_pipeline = QueryPipeline::new();
-
-                    state
-                        .action_flags
-                        .set(TestbedActionFlags::RESET_WORLD_GRAPHICS, true);
+                    // set_world(w.3, w.4, w.5);
+                    harness.physics.broad_phase = w.1;
+                    harness.physics.narrow_phase = w.2;
+                    harness.state.timestep_id = w.0;
                 }
             }
         }
@@ -1399,7 +1371,7 @@ fn update_testbed(
                     components: &mut gfx_components,
                     camera_transform: *cameras.single().1,
                     camera: &mut cameras.single_mut().2,
-                    keys: &keys,
+                    keys: &*keys,
                 };
                 harness.step_with_graphics(Some(&mut testbed_graphics));
 
@@ -1452,9 +1424,9 @@ fn update_testbed(
     if let Ok(window) = windows.get_single() {
         for (camera, camera_pos, _) in cameras.iter_mut() {
             highlight_hovered_body(
-                &mut material_handles,
-                &mut graphics,
-                &mut state,
+                &mut *materials,
+                &mut *graphics,
+                &mut *state,
                 &harness.physics,
                 window,
                 camera,
@@ -1506,7 +1478,7 @@ fn clear(
 
 #[cfg(feature = "dim2")]
 fn highlight_hovered_body(
-    _material_handles: &mut Query<&mut Handle<BevyMaterial>>,
+    _materials: &mut Assets<BevyMaterial>,
     _graphics_manager: &mut GraphicsManager,
     _testbed_state: &mut TestbedState,
     _physics: &PhysicsState,
@@ -1519,7 +1491,7 @@ fn highlight_hovered_body(
 
 #[cfg(feature = "dim3")]
 fn highlight_hovered_body(
-    material_handles: &mut Query<&mut Handle<BevyMaterial>>,
+    materials: &mut Assets<BevyMaterial>,
     graphics_manager: &mut GraphicsManager,
     testbed_state: &mut TestbedState,
     physics: &PhysicsState,
@@ -1530,9 +1502,7 @@ fn highlight_hovered_body(
     if let Some(highlighted_body) = testbed_state.highlighted_body {
         if let Some(nodes) = graphics_manager.body_nodes_mut(highlighted_body) {
             for node in nodes {
-                if let Ok(mut handle) = material_handles.get_mut(node.entity) {
-                    *handle = node.material.clone_weak()
-                };
+                node.unselect(materials)
             }
         }
     }
@@ -1564,12 +1534,8 @@ fn highlight_hovered_body(
 
             if let Some(parent_handle) = collider.parent() {
                 testbed_state.highlighted_body = Some(parent_handle);
-                let selection_material = graphics_manager.selection_material();
-
                 for node in graphics_manager.body_nodes_mut(parent_handle).unwrap() {
-                    if let Ok(mut handle) = material_handles.get_mut(node.entity) {
-                        *handle = selection_material.clone_weak();
-                    }
+                    node.select(materials)
                 }
             }
         }

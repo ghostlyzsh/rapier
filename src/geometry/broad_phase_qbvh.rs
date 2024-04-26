@@ -7,20 +7,20 @@ use parry::query::visitors::BoundingVolumeIntersectionsSimultaneousVisitor;
 
 #[cfg_attr(feature = "serde-serialize", derive(Serialize, Deserialize))]
 #[derive(Clone)]
-pub struct BroadPhaseQbvh {
+pub struct BroadPhase {
     qbvh: Qbvh<ColliderHandle>,
     stack: Vec<(u32, u32)>,
     #[cfg_attr(feature = "serde-serialize", serde(skip))]
     workspace: QbvhUpdateWorkspace,
 }
 
-impl Default for BroadPhaseQbvh {
+impl Default for BroadPhase {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl BroadPhaseQbvh {
+impl BroadPhase {
     pub fn new() -> Self {
         Self {
             qbvh: Qbvh::new(),

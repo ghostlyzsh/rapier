@@ -1,8 +1,10 @@
 use super::NEXT_FREE_SENTINEL;
 use crate::geometry::broad_phase_multi_sap::SAPRegion;
-use crate::geometry::{BroadPhaseProxyIndex, ColliderHandle};
+use crate::geometry::ColliderHandle;
 use parry::bounding_volume::Aabb;
 use std::ops::{Index, IndexMut};
+
+pub type SAPProxyIndex = u32;
 
 #[cfg_attr(feature = "serde-serialize", derive(Serialize, Deserialize))]
 #[derive(Clone)]
@@ -13,7 +15,10 @@ pub enum SAPProxyData {
 
 impl SAPProxyData {
     pub fn is_region(&self) -> bool {
-        matches!(self, SAPProxyData::Region(_))
+        match self {
+            SAPProxyData::Region(_) => true,
+            _ => false,
+        }
     }
 
     pub fn as_region(&self) -> &SAPRegion {
@@ -47,7 +52,7 @@ impl SAPProxyData {
 pub struct SAPProxy {
     pub data: SAPProxyData,
     pub aabb: Aabb,
-    pub next_free: BroadPhaseProxyIndex,
+    pub next_free: SAPProxyIndex,
     // TODO: pack the layer_id and layer_depth into a single u16?
     pub layer_id: u8,
     pub layer_depth: i8,
@@ -79,7 +84,7 @@ impl SAPProxy {
 #[derive(Clone)]
 pub struct SAPProxies {
     pub elements: Vec<SAPProxy>,
-    pub first_free: BroadPhaseProxyIndex,
+    pub first_free: SAPProxyIndex,
 }
 
 impl Default for SAPProxies {
@@ -96,8 +101,8 @@ impl SAPProxies {
         }
     }
 
-    pub fn insert(&mut self, proxy: SAPProxy) -> BroadPhaseProxyIndex {
-        if self.first_free != NEXT_FREE_SENTINEL {
+    pub fn insert(&mut self, proxy: SAPProxy) -> SAPProxyIndex {
+        let result = if self.first_free != NEXT_FREE_SENTINEL {
             let proxy_id = self.first_free;
             self.first_free = self.elements[proxy_id as usize].next_free;
             self.elements[proxy_id as usize] = proxy;
@@ -105,34 +110,36 @@ impl SAPProxies {
         } else {
             self.elements.push(proxy);
             self.elements.len() as u32 - 1
-        }
+        };
+
+        result
     }
 
-    pub fn remove(&mut self, proxy_id: BroadPhaseProxyIndex) {
+    pub fn remove(&mut self, proxy_id: SAPProxyIndex) {
         let proxy = &mut self.elements[proxy_id as usize];
         proxy.next_free = self.first_free;
-        self.first_free = proxy_id;
+        self.first_free = proxy_id as u32;
     }
 
     // NOTE: this must not take holes into account.
-    pub fn get_mut(&mut self, i: BroadPhaseProxyIndex) -> Option<&mut SAPProxy> {
+    pub fn get_mut(&mut self, i: SAPProxyIndex) -> Option<&mut SAPProxy> {
         self.elements.get_mut(i as usize)
     }
     // NOTE: this must not take holes into account.
-    pub fn get(&self, i: BroadPhaseProxyIndex) -> Option<&SAPProxy> {
+    pub fn get(&self, i: SAPProxyIndex) -> Option<&SAPProxy> {
         self.elements.get(i as usize)
     }
 }
 
-impl Index<BroadPhaseProxyIndex> for SAPProxies {
+impl Index<SAPProxyIndex> for SAPProxies {
     type Output = SAPProxy;
-    fn index(&self, i: BroadPhaseProxyIndex) -> &SAPProxy {
+    fn index(&self, i: SAPProxyIndex) -> &SAPProxy {
         self.elements.index(i as usize)
     }
 }
 
-impl IndexMut<BroadPhaseProxyIndex> for SAPProxies {
-    fn index_mut(&mut self, i: BroadPhaseProxyIndex) -> &mut SAPProxy {
+impl IndexMut<SAPProxyIndex> for SAPProxies {
+    fn index_mut(&mut self, i: SAPProxyIndex) -> &mut SAPProxy {
         self.elements.index_mut(i as usize)
     }
 }

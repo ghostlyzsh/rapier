@@ -114,7 +114,6 @@ pub struct QueryFilter<'a> {
     /// If set, any collider attached to this rigid-body will be excluded from the scene query.
     pub exclude_rigid_body: Option<RigidBodyHandle>,
     /// If set, any collider for which this closure returns false will be excluded from the scene query.
-    #[allow(clippy::type_complexity)] // Type doesn’t look really complex?
     pub predicate: Option<&'a dyn Fn(ColliderHandle, &Collider) -> bool>,
 }
 
@@ -669,10 +668,10 @@ impl QueryPipeline {
     ///   the shape is penetrating another shape at its starting point **and** its trajectory is such
     ///   that it’s on a path to exist that penetration state.
     /// * `filter`: set of rules used to determine which collider is taken into account by this scene query.
-    pub fn cast_shape(
+    pub fn cast_shape<'a>(
         &self,
         bodies: &RigidBodySet,
-        colliders: &ColliderSet,
+        colliders: &'a ColliderSet,
         shape_pos: &Isometry<Real>,
         shape_vel: &Vector<Real>,
         shape: &dyn Shape,
@@ -747,10 +746,10 @@ impl QueryPipeline {
     /// * `shape` - The shape to test.
     /// * `filter`: set of rules used to determine which collider is taken into account by this scene query.
     /// * `callback` - A function called with the handles of each collider intersecting the `shape`.
-    pub fn intersections_with_shape(
+    pub fn intersections_with_shape<'a>(
         &self,
         bodies: &RigidBodySet,
-        colliders: &ColliderSet,
+        colliders: &'a ColliderSet,
         shape_pos: &Isometry<Real>,
         shape: &dyn Shape,
         filter: QueryFilter,

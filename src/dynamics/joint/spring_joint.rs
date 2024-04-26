@@ -94,9 +94,9 @@ impl SpringJoint {
     // }
 }
 
-impl From<SpringJoint> for GenericJoint {
-    fn from(val: SpringJoint) -> GenericJoint {
-        val.data
+impl Into<GenericJoint> for SpringJoint {
+    fn into(self) -> GenericJoint {
+        self.data
     }
 }
 
@@ -165,8 +165,8 @@ impl SpringJointBuilder {
     }
 }
 
-impl From<SpringJointBuilder> for GenericJoint {
-    fn from(val: SpringJointBuilder) -> GenericJoint {
-        val.0.into()
+impl Into<GenericJoint> for SpringJointBuilder {
+    fn into(self) -> GenericJoint {
+        self.0.into()
     }
 }

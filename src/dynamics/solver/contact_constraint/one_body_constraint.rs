@@ -76,7 +76,7 @@ impl OneBodyConstraintBuilder {
 
         let rb1 = handle1
             .map(|h| SolverBody::from(&bodies[h]))
-            .unwrap_or_default();
+            .unwrap_or_else(SolverBody::default);
 
         let rb2 = &bodies[handle2.unwrap()];
         let vels2 = &rb2.vels;
@@ -149,7 +149,7 @@ impl OneBodyConstraintBuilder {
                         rhs: na::zero(),
                         rhs_wo_bias: na::zero(),
                         impulse: na::zero(),
-                        impulse_accumulator: na::zero(),
+                        total_impulse: na::zero(),
                         r: projected_mass,
                     };
                 }
@@ -270,17 +270,18 @@ impl OneBodyConstraintBuilder {
                     * (dist + params.allowed_linear_error)
                         .clamp(-params.max_penetration_correction, 0.0);
                 let new_rhs = rhs_wo_bias + rhs_bias;
+                let total_impulse = element.normal_part.total_impulse + element.normal_part.impulse;
                 is_fast_contact = is_fast_contact || (-new_rhs * params.dt > ccd_thickness * 0.5);
 
                 element.normal_part.rhs_wo_bias = rhs_wo_bias;
                 element.normal_part.rhs = new_rhs;
-                element.normal_part.impulse_accumulator += element.normal_part.impulse;
+                element.normal_part.total_impulse = total_impulse;
                 element.normal_part.impulse = na::zero();
             }
 
             // Tangent part.
             {
-                element.tangent_part.impulse_accumulator += element.tangent_part.impulse;
+                element.tangent_part.total_impulse += element.tangent_part.impulse;
                 element.tangent_part.impulse = na::zero();
 
                 for j in 0..DIM - 1 {
@@ -333,7 +334,7 @@ impl OneBodyConstraint {
         solve_normal: bool,
         solve_friction: bool,
     ) {
-        let mut solver_vel2 = solver_vels[self.solver_vel2];
+        let mut solver_vel2 = solver_vels[self.solver_vel2 as usize];
 
         OneBodyConstraintElement::solve_group(
             self.cfm_factor,
@@ -348,7 +349,7 @@ impl OneBodyConstraint {
             solve_friction,
         );
 
-        solver_vels[self.solver_vel2] = solver_vel2;
+        solver_vels[self.solver_vel2 as usize] = solver_vel2;
     }
 
     // FIXME: duplicated code. This is exactly the same as in the two-body velocity constraint.
@@ -358,16 +359,15 @@ impl OneBodyConstraint {
         for k in 0..self.num_contacts as usize {
             let contact_id = self.manifold_contact_id[k];
             let active_contact = &mut manifold.points[contact_id as usize];
-            active_contact.data.impulse = self.elements[k].normal_part.total_impulse();
+            active_contact.data.impulse = self.elements[k].normal_part.impulse;
 
             #[cfg(feature = "dim2")]
             {
-                active_contact.data.tangent_impulse =
-                    self.elements[k].tangent_part.total_impulse()[0];
+                active_contact.data.tangent_impulse = self.elements[k].tangent_part.impulse[0];
             }
             #[cfg(feature = "dim3")]
             {
-                active_contact.data.tangent_impulse = self.elements[k].tangent_part.total_impulse();
+                active_contact.data.tangent_impulse = self.elements[k].tangent_part.impulse;
             }
         }
     }

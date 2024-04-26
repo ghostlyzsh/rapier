@@ -5,4 +5,4 @@ pub use self::debug_render_style::{DebugColor, DebugRenderStyle};
 mod debug_render_backend;
 mod debug_render_pipeline;
 mod debug_render_style;
-mod outlines;
+pub(self) mod outlines;

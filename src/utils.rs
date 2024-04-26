@@ -25,7 +25,7 @@ impl SimdRealCopy for SimdReal {}
 const INV_EPSILON: Real = 1.0e-20;
 
 pub(crate) fn inv(val: Real) -> Real {
-    if (-INV_EPSILON..=INV_EPSILON).contains(&val) {
+    if val >= -INV_EPSILON && val <= INV_EPSILON {
         0.0
     } else {
         1.0 / val
