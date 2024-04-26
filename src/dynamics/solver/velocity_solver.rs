@@ -201,9 +201,11 @@ impl VelocitySolver {
             /*
              * Resolution without bias.
              */
-            joint_constraints.solve_wo_bias(&mut self.solver_vels, &mut self.generic_solver_vels);
-            contact_constraints
-                .solve_restitution_wo_bias(&mut self.solver_vels, &mut self.generic_solver_vels);
+            for _ in 0..params.num_stabilization_iterations {
+                joint_constraints.solve_wo_bias(&mut self.solver_vels, &mut self.generic_solver_vels);
+                contact_constraints
+                    .solve_restitution_wo_bias(&mut self.solver_vels, &mut self.generic_solver_vels);
+            }
         }
     }
 

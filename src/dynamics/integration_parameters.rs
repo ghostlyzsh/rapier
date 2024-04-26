@@ -50,6 +50,7 @@ pub struct IntegrationParameters {
     pub num_additional_friction_iterations: usize,
     /// Number of internal Project Gauss Seidel (PGS) iterations run at each solver iteration (default: `1`).
     pub num_internal_pgs_iterations: usize,
+    pub num_stabilization_iterations: usize,
     /// Minimum number of dynamic bodies in each active island (default: `128`).
     pub min_island_size: usize,
     /// Maximum number of substeps performed by the  solver (default: `1`).
@@ -205,6 +206,7 @@ impl Default for IntegrationParameters {
             num_internal_pgs_iterations: 1,
             num_additional_friction_iterations: 4,
             num_solver_iterations: NonZeroUsize::new(4).unwrap(),
+            num_stabilization_iterations: 1,
             // TODO: what is the optimal value for min_island_size?
             // It should not be too big so that we don't end up with
             // huge islands that don't fit in cache.
